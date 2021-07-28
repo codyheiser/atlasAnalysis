@@ -251,3 +251,120 @@ snr <- function(imgname, mask, maskThr=0, transform=log10, offset=1){
   #snrTransform = cellStats(imgs, 'mean')/cellStats(imgs, 'sd')
   c(mu=mu, sigma=sigma)
 }
+
+
+setup_data <- function(
+  wd,
+  slides,
+  markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN")
+){
+  #' Sets up data structure to loop through when clustering images
+  #'
+  #' @param wd path to base directory containing image data
+  #' @param slides list of slide names (subdirectories of `wd`) to cluster with
+  #' @param markers list of markers to use for tissue clustering
+  #'
+  #' @return sr
+  sr <- list()
+  for(i in 1:length(slides)){
+    file <- file.path(wd, sprintf('%s/%s_thresholds.csv', slides[i], slides[i]))
+    sr[[i]] <- read.csv(file)
+  }
+  sr <- do.call(rbind,sr)
+  sr$slideRegion <- sprintf('%s_region%s',sr$Slide,sr$Region)
+  sr <- sr[!duplicated(sr$slideRegion), c('Slide', 'Region', 'slideRegion')]
+  # set up expected file paths
+  sr[,markers] <- sapply(
+    markers,
+    function(m) file.path(
+      wd,
+      sr$Slide,
+      sprintf('%s_ADJ_region_%03d.tif', m, sr$Region)
+    )
+  )
+  sr[,'mask'] <- file.path(
+    wd,
+    sr$Slide,
+    sprintf('%s_%02d_TISSUE_MASK.tif', sr$Slide, sr$Region)
+  )
+  sr[,'tumorMask'] <- file.path(
+    wd,
+    sr$Slide,
+    sprintf('Tumor_mask_region_%03d.png', sr$Region)
+  )
+  sr[,'epiMask'] <- file.path(
+    wd,
+    sr$Slide,
+    sprintf('%s_region_%03d_epi_mask.png', sr$Slide, sr$Region)
+  )
+  sr[,'strMask'] <- file.path(
+    wd,
+    sr$Slide,
+    sprintf('%s_region_%03d_stroma_mask.png', sr$Slide, sr$Region)
+  )
+  # check that all the images exist
+  test <- sapply(sr[,allMarkers], file.exists)
+  message(
+    paste0(
+      sum(test) / (dim(test)[1] * dim(test)[2]) * 100,
+      " % of expected images were found in ",
+      wd
+    )
+  )
+  # only use regions with tissue mask
+  sr = sr[file.exists(sr$mask),]
+  return(sr)
+}
+
+
+downsample_data <- function(
+  sr,
+  fact=8,
+  markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
+  masks=c("mask","epiMask","strMask","tumorMask"),
+  njobs=4
+){
+  #' Downsamples images in data structure output from `setup_data`
+  #'
+  #' @param sr data structure output from `setup_data`
+  #' @param fact factor to downsample in each dimension, in pixels
+  #' @param markers list of markers to downsample
+  #' @param masks list of masks to downsample
+  #' @param njobs number of CPU cores to use in `mcmapply`
+  #'
+  #' @return sr
+  origmarkers = sr  # copy object for pulling full-res file names
+  # downsample markers using average value across pixels
+  for(marker in markers){
+    sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
+    if(!all(file.exists(sr[ss,marker]))){
+      message(marker)
+      mcmapply(
+        downsample,
+        img=origmarkers[ss,marker],
+        outimg=sr[ss,marker],
+        fact=fact,
+        mask=origmarkers[ss,"mask"],
+        fun="mean",
+        mc.cores=njobs
+      )
+    }
+  }
+  # downsample masks using mode
+  for(marker in masks){
+    sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
+    if(!all(file.exists(sr[ss,marker]))){
+      message(marker)
+      mcmapply(
+        downsample,
+        img=origmarkers[ss,marker],
+        outimg=sr[ss,marker],
+        fact=fact,
+        mask=origmarkers[ss,"mask"],
+        fun="modal",
+        mc.cores=njobs
+      )
+    }
+  }
+  return(sr)
+}

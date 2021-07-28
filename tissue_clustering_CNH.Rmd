@@ -33,19 +33,19 @@ It checks some dimensions of images, because the mask was not the right dimensio
 We need to get a mask from Joe that excludes regions where the tissue came off the slide across the rounds of staining.
 
 ```{r dataSetup, echo=FALSE}
-wd <- "~/biostat_clustering/"  # working base directory
+wd <- "/media/disk2/atlas_mxif/T_cell_quantification/Images_CNH/"  # working base directory
 
 # markers to use:
 # These are modifiable. location markers are used for clustering
 locationMarkers <- c(
-  'ACTININ',
-  'BCATENIN',
+  #'ACTININ',
+  #'BCATENIN',
   #'CGA',
   'COLLAGEN',
-  'COX2',
+  #'COX2',
   'DAPI',
-  'ERBB2',
-  'GACTIN',
+  #'ERBB2',
+  #'GACTIN',
   #'HLAA',
   #'LYSOZYME',
   'MUC2',
@@ -56,8 +56,8 @@ locationMarkers <- c(
   #'PDL1',
   #'PEGFR',
   #'PSTAT3',
-  'SMA',
-  'SNA',
+  #'SMA',
+  #'SNA',
   'SOX9',
   'VIMENTIN'
   )
@@ -65,24 +65,30 @@ locationMarkers <- c(
 # immune markers for downstream tissue infiltration analysis
 immuneMarkers <- c(
   #'FOXP3',
-  'CD3D',
-  'CD4',
-  'CD8',
-  'CD11B',
-  'CD20',
-  'CD45',
-  'CD45B',
-  'CD68'
+  #'CD3D',
+  #'CD4',
+  #'CD8',
+  #'CD11B',
+  #'CD20',
+  #'CD45',
+  #'CD45B',
+  #'CD68'
   )
 
 # define slide names in directory structure
 slides <- c(
   "MAP00083_0000_02_01",
   "MAP00347_0000_03_02",
-  "MAP02112_0000_02_02",
-  "MAP05994_0000_01A_0",
-  "MAP06025_0000_02_01"
+  "MAP00377_0000_01_01",
+  "MAP00392_0000_01F_01",
+  "MAP00411_0000_01A_0",
+  #"MAP00546_0000_02_02",
+  "MAP02112_0000_02_02"
+  #"MAP05994_0000_01A_0",
+  #"MAP06025_0000_02_01"
   )
+
+sr2 <- setup_data(wd = wd, slides = slides, markers = locationMarkers)
 
 # read in immune marker thresholds for each slide
 threshold <- list()
@@ -93,7 +99,7 @@ for(i in 1:length(slides)){
   threshold[[i]] <- threshold_i
 }
 threshold <- do.call(rbind,threshold)
-nulls <- which(threshold$Threshold==0)
+#nulls <- which(threshold$Threshold==0)
 #threshold <- threshold[-nulls,]
 threshold$slideRegion <- sprintf('%s_region%s',threshold$Slide,threshold$Region)
 slideRegion <- unique(threshold$slideRegion)
@@ -122,7 +128,7 @@ sr[,'epiMask'] = file.path(wd, sr$Slide, sprintf('%s_region_%03d_epi_mask.png', 
 sr[,'strMask'] = file.path(wd, sr$Slide, sprintf('%s_region_%03d_stroma_mask.png', sr$Slide, sr$Region))
 
 # check that all the images exist
-sapply(sr[,allMarkers], file.exists)
+sum(sapply(sr[,allMarkers], file.exists)) / (dim(sapply(sr[,allMarkers], file.exists))[1] * dim(sapply(sr[,allMarkers], file.exists))[2]) * 100
 
 # append tumor subtype information
 tts = read.csv(file.path(wd, 'TissueSubTypes Colon Map.csv'))
@@ -174,20 +180,22 @@ for(marker in c(allMarkers)){
   sr[,marker] = gsub('\\.tif$', '_downsampled.tif', origmarkers[,marker])
   if(!all(file.exists(sr[ss,marker]))){
     message(marker)
-    mcmapply(downsample, origmarkers[ss,marker], sr[ss,marker], MoreArgs=list(fact=fact), mc.cores = 2 )
+    mcmapply(downsample, origmarkers[ss,marker], sr[ss,marker], MoreArgs=list(fact=fact), mc.cores = 2)
   }
 }
 # `all scheduled cores encountered errors in user code`
 #   MAP06025_0000_02_01/CD68_region_003_threshold.png
 
-# This downsamples using the model instead, which makes more sense for mask images.
+# This downsamples using the mode instead, which makes more sense for mask images.
 # downsample(origmarkers$epiMask[1], sr$epiMask[1], mask=origmarkers[1, 'mask'], fact=fact, fun='modal')
 # The mask argument is used, because some images were at a different resolution than the others, so I had to downsample some differently.
-for(marker in c('epiMask', 'strMask', 'mask', 'tumorMask', immunePosMarkers)){
+
+#for(marker in c('epiMask', 'strMask', 'mask', 'tumorMask', immunePosMarkers)){
+for(marker in c('epiMask', 'strMask', 'mask', 'tumorMask')){
   sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
   if(!all(file.exists(sr[ss,marker]))){
     message(marker)
-    mcmapply(downsample, origmarkers[ss,marker], sr[ss,marker], mask=origmarkers[ss,'mask'], MoreArgs=list(fact=fact, fun='modal'), mc.cores = 40)
+    mcmapply(downsample, origmarkers[ss,marker], sr[ss,marker], mask=origmarkers[ss,'mask'], MoreArgs=list(fact=fact, fun='modal'), mc.cores = 4)
   }
 }
 # deletes all downsampled markers
@@ -200,13 +208,13 @@ sr$locationLabel = gsub('DAPI', 'location_label', sr[,'DAPI'])
 sr$locationLabelUntransformed = gsub('DAPI', 'location_label_untransformed', sr[,'DAPI'])
 
 # Threshold to define a mask from the DAPI images. Not sure why I chose this over the mask images.
-dapiThr = 5
+dapiThr=5
 # factor for subsampling the images
-fact = 10
+fact=10
 # offset parameter for transformation
-offset=0.001
+offset=1
 # parameters for k-means
-k = 5
+k=4
 
 # Create file names for smoothed downsampled images
 slocationMarkers = paste(locationMarkers, 'smooth', sep="_")
