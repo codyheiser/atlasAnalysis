@@ -1,7 +1,7 @@
 ---
 title: "Image Level Analysis"
 author: "Cody Heiser"
-date: "7/27/2021"
+date: "7/28/2021"
 output: html_document
 ---
 
@@ -26,10 +26,9 @@ library(emmeans)
 library(sjPlot)
 ```
 
-## Overview
+## 1. Setup
 
-This first code chunk sets up the data frame `sr` that contains directories to all of the images.
-It checks some dimensions of images, because the mask was not the right dimension for some images.
+This first code chunk sets up the data frame `sr` that contains file paths to all of the images.
 We need to get a mask from Joe that excludes regions where the tissue came off the slide across the rounds of staining.
 
 ```{r dataSetup, echo=FALSE}
@@ -52,7 +51,7 @@ locationMarkers <- c(
   'NAKATPASE',
   'OLFM4',
   'PANCK',
-  'PCNA',
+  #'PCNA',
   #'PDL1',
   #'PEGFR',
   #'PSTAT3',
@@ -78,297 +77,107 @@ immuneMarkers <- c(
 # define slide names in directory structure
 slides <- c(
   "MAP00083_0000_02_01",
-  "MAP00347_0000_03_02",
-  "MAP00377_0000_01_01",
-  "MAP00392_0000_01F_01",
-  "MAP00411_0000_01A_0",
+  "MAP00347_0000_03_02"
+  #"MAP00377_0000_01_01",
+  #"MAP00392_0000_01F_01",
+  #"MAP00411_0000_01A_0",
   #"MAP00546_0000_02_02",
-  "MAP02112_0000_02_02"
+  #"MAP02112_0000_02_02",
   #"MAP05994_0000_01A_0",
   #"MAP06025_0000_02_01"
   )
 
-sr2 <- setup_data(wd = wd, slides = slides, markers = locationMarkers)
+# use data setup function to create sr
+sr <- setup_data(
+  wd = wd,
+  slides = slides,
+  markers = locationMarkers
+)
 
-# read in immune marker thresholds for each slide
-threshold <- list()
-for(i in 1:length(slides)){
-  slide_i <- slides[i]
-  file <- file.path(wd, sprintf('%s/%s_thresholds.csv',slide_i,slide_i))
-  threshold_i <- read.csv(file)
-  threshold[[i]] <- threshold_i
-}
-threshold <- do.call(rbind,threshold)
-#nulls <- which(threshold$Threshold==0)
-#threshold <- threshold[-nulls,]
-threshold$slideRegion <- sprintf('%s_region%s',threshold$Slide,threshold$Region)
-slideRegion <- unique(threshold$slideRegion)
-
-# # split slide regions into train and test sets
-# size <- length(slides)
-# test_id <- sample(1:size,size/2,replace = F)
-# test_s <- slides[test_id]
-# test <- threshold[threshold$Slide%in%test_s,]
-# train_s <- slides[-test_id]
-# train <- threshold[threshold$Slide%in%train_s,]
-
-idVars = c('Slide', 'Region', 'slideRegion')
-sr = threshold[!duplicated(threshold$slideRegion), idVars]
-
-immunePosMarkers = paste0(immuneMarkers, 'pos')
-
-names(locationMarkers) = locationMarkers
-
-allMarkers = c(immuneMarkers, locationMarkers)
-sr[,allMarkers] = sapply(allMarkers, function(marker) file.path(wd, sr$Slide, sprintf('%s_ADJ_region_%03d.tif', marker, sr$Region)))
-sr[,immunePosMarkers] = sapply(immuneMarkers, function(marker) file.path(wd, sr$Slide, sprintf('%s_region_%03d_threshold.png', marker, sr$Region)))
-sr[,'mask'] = file.path(wd, sr$Slide, sprintf('%s_%02d_TISSUE_MASK.tif', sr$Slide, sr$Region))
-sr[,'tumorMask'] = file.path(wd, sr$Slide, sprintf('Tumor_mask_region_%03d.png', sr$Region))
-sr[,'epiMask'] = file.path(wd, sr$Slide, sprintf('%s_region_%03d_epi_mask.png', sr$Slide, sr$Region))
-sr[,'strMask'] = file.path(wd, sr$Slide, sprintf('%s_region_%03d_stroma_mask.png', sr$Slide, sr$Region))
-
-# check that all the images exist
-sum(sapply(sr[,allMarkers], file.exists)) / (dim(sapply(sr[,allMarkers], file.exists))[1] * dim(sapply(sr[,allMarkers], file.exists))[2]) * 100
-
-# append tumor subtype information
-tts = read.csv(file.path(wd, 'TissueSubTypes Colon Map.csv'))
-names(tts)[1] = 'TissueID'  # match capitalization
-sr$TissueID = sr$Slide
-sr = merge(sr, tts, all.x=TRUE)
-sr$adenSSLcrc = ifelse(sr$tissueSubType %in% c('Tub', 'TV'), 'adenoma', 
-                        ifelse(sr$tissueSubType %in% c('HP', 'HP/SSL', 'SSL', 'Tub/SSL'), 'SSL', 
-                               ifelse(sr$tissueSubType %in% c('CRC'), 'CRC', NA )) )
-
-sr = sr[file.exists(sr$mask),]  # only use regions with tissue mask
-#sr = sr[ file.exists(sr$tumorMask),]  # only use regions with tumor mask
-
-# MAP03361_0000_01A_01 has some bad regions due to tissue falling off the slide
-#ss = grep('MAP00347_0000_03_02|MAP00866_0000_02_02|MAP04781_0000_01_01|MAP03410_0000_06A_02|MAP00083_0000_02_01|MAP00392_0000_01F_01|MAP00411_0000_01A_0|MAP02112_0000_02_02', sr$Slide)
-ss = 1:nrow(sr)
-
-# checks that mask image matches dimensions of DAPI image (some didn't)
-dimsMatch = apply(sr[ss,], 1, function(x) all(dim(raster(x['mask'])) == dim(raster(x['DAPI']))) )
-ss = ss[dimsMatch]
+# # append tumor subtype information (optional)
+# tts = read.csv(file.path(wd, 'TissueSubTypes Colon Map.csv'))
+# names(tts)[1] = 'TissueID'  # match capitalization
+# sr$TissueID = sr$Slide
+# sr = merge(sr, tts, all.x=TRUE)
+# sr$adenSSLcrc = ifelse(sr$tissueSubType %in% c('Tub', 'TV'), 'adenoma', 
+#                         ifelse(sr$tissueSubType %in% c('HP', 'HP/SSL', 'SSL', 'Tub/SSL'), 'SSL', 
+#                                ifelse(sr$tissueSubType %in% c('CRC'), 'CRC', NA )) )
+# ss = 1:nrow(sr)  # get counter to use in loops
+# # checks that mask image matches dimensions of DAPI image (some didn't)
+# dimsMatch = apply(sr[ss,], 1, function(x) all(dim(raster(x['mask'])) == dim(raster(x['DAPI']))) )
+# ss = ss[dimsMatch]
 ```
 
-### Markers
+## 2. Downsampling
 
-We will use the markers `r paste(locationMarkers, collapse=', ')`, as input to the Kmeans/NMF to define tissue classes and use the immune markers, `r paste(immuneMarkers, collapse=', ')`, to model infiltration into different compartments of the tissue or other spatial features within each tissue compartment.
-
-
-## Downsample the images
-
-Here, we downsample the images as input to Kmeans or NMF to define general tissue level clusters.
+Here, we downsample the images as input to Kmeans clustering to define general tissue level clusters.
 The downsampling returns the mean value of the pixels in the lower resolution image.
 This substantially changes the distribution of the image intensities.
 The `fun` argument of the downsample function can be used to change how smaller pixel values are combined into the larger value.
 Median would be another reasonable choice, probably.
-This takes a while to run.
-It checks if the downsampled images exist for all the images first before running.
-Change the `mc.cores` argument to use more cores.
 
-The code chunk below also includes parameters for the kmeans and smoothing.
+The code chunk below also includes initial parameters for the kmeans and smoothing.
 
 ```{r downsample}
-# factor to downsample, in each dimension (I think)
-fact = 8
-
-# origmarkers is going to contain the undownsampled images
-origmarkers = sr
-
-for(marker in c(allMarkers)){
-  sr[,marker] = gsub('\\.tif$', '_downsampled.tif', origmarkers[,marker])
-  if(!all(file.exists(sr[ss,marker]))){
-    message(marker)
-    mcmapply(downsample, origmarkers[ss,marker], sr[ss,marker], MoreArgs=list(fact=fact), mc.cores = 2)
-  }
-}
-# `all scheduled cores encountered errors in user code`
-#   MAP06025_0000_02_01/CD68_region_003_threshold.png
-
-# This downsamples using the mode instead, which makes more sense for mask images.
-# downsample(origmarkers$epiMask[1], sr$epiMask[1], mask=origmarkers[1, 'mask'], fact=fact, fun='modal')
-# The mask argument is used, because some images were at a different resolution than the others, so I had to downsample some differently.
-
-#for(marker in c('epiMask', 'strMask', 'mask', 'tumorMask', immunePosMarkers)){
-for(marker in c('epiMask', 'strMask', 'mask', 'tumorMask')){
-  sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
-  if(!all(file.exists(sr[ss,marker]))){
-    message(marker)
-    mcmapply(downsample, origmarkers[ss,marker], sr[ss,marker], mask=origmarkers[ss,'mask'], MoreArgs=list(fact=fact, fun='modal'), mc.cores = 4)
-  }
-}
-# deletes all downsampled markers
-# apply(sr[,allMarkers], 2, unlink)
+# use downsampling function to loop through sr
+sr2 <- downsample_data(
+  sr,
+  fact = 8,
+  markers = locationMarkers,
+  masks = c("mask","epiMask","strMask","tumorMask"),
+  njobs = 4
+)
 
 # SET UP TO DO K-MEANS CLUSTERING:  image(raster(sr$MUC2[1]))
 # location label will be an image containing the tissue classes
-sr$locationLabel = gsub('DAPI', 'location_label', sr[,'DAPI'])
+sr2$locationLabel = gsub('DAPI', 'location_label', sr2[,'DAPI'])
 # same, except the input data will be untransformed
-sr$locationLabelUntransformed = gsub('DAPI', 'location_label_untransformed', sr[,'DAPI'])
-
-# Threshold to define a mask from the DAPI images. Not sure why I chose this over the mask images.
-dapiThr=5
-# factor for subsampling the images
-fact=10
-# offset parameter for transformation
-offset=1
-# parameters for k-means
-k=4
-
-# Create file names for smoothed downsampled images
-slocationMarkers = paste(locationMarkers, 'smooth', sep="_")
-#snormedMarkers = paste(normedMarkers, 'smooth', sep='_')
-simmuneMarkers = paste(immuneMarkers, 'smooth', sep="_")
-sr[,c(slocationMarkers, simmuneMarkers)] = apply(sr[,c(locationMarkers, immuneMarkers)], 2, function(x) gsub('\\.tif$', '_smoothed.tif', x) )
+sr2$locationLabelUntransformed = gsub('DAPI', 'location_label_untransformed', sr2[,'DAPI'])
 ```
 
-## Image normalization
+## 3. Spatial Smoothing
 
-In this section I applied some image normalization while extracting data "subsampling" from the images. This subsample is selected to estimate the FDA normalization. Because we're not using it currently, this whole section is not run.
-
-* I subsample at a factor of ``r fact``, so I sample 1/``r fact^2`` of the data on a grid.
-* The DAPI image is thresholded at ``r dapiThr`` to define a mask. This doesn't work real well. I need a mask from Joe created comparing the first and last DAPI images.
-* I used mean division with an offset of ``r offset`` and a `log10` transformation.
-* I also used mean division without a `log10` transformation too.
-
-Code to do the FDA is not run.
-
-### Subsample the images first
-
-This is actually not run now, because we don't need to extract the data if we aren't going to FDA normalization.
-
-```{r getData, eval=FALSE}
-# these are the markers we want to normalize
-normalizationMarkers = locationMarkers
-
-# no transformation
-rownames(sr) = sr$slideRegion
-normData = subsampImgs(sr[ss, normalizationMarkers], sr[ss, 'mask'], maskThr = dapiThr, subsamp = fact, offset = offset)
-normData$ID = gsub('_region.*$', '', normData$ID)
-
-# with transformation
-unnormData = subsampImgs(sr[ss, normalizationMarkers], sr[ss, 'mask'], maskThr = dapiThr, subsamp = fact, offset = 0, transform = function(x) x)
-unnormData$ID = gsub('_region.*$', '', normData$ID)
-
-
-#layout(matrix(1:(ncol(normData)-1), nrow=2))
-# To visualize the histograms
-#apply(normData[,-6], 2, range)
-#apply(normData[,-6], 2, hist)
-#unlink(file.path(tempdir(), '*'), recursive = TRUE)
-#converts a raster to a polygon object
-#rasterToPolygons(r, fun=function(x){x>6})
-```
-
-This is the code chunk to apply FDA. I've removed these functions from this script, but if you want to use them we can reincorporate them.
-
-```{r applyFDAnormalization, fig.width=16, fig.height=6, eval=FALSE}
-normedMarkers = paste0(normalizationMarkers, '_norm')
-sr[,normedMarkers] = apply(sr[, normalizationMarkers], 2, function(x) gsub('\\.tif', '_normed.tif', x) )
-
-#debug(fdaEstimate)
-#regFuncs = fdaEstimate(normData[,normalizationMarkers], normData$ID)
-res2 = fdaNormalize(normData[,normalizationMarkers], dataSubjectID = normData$ID, imgSubjectID = sr$Slide[ss], imgs=sr[ss, normalizationMarkers], outimgs = sr[ss,normedMarkers], masks = sr[ss, 'mask'], offset=offset, nit = 1, nbasisNorm=2, norderNorm=2)
-res4 = fdaNormalize(normData[,normalizationMarkers], dataSubjectID = normData$ID, imgSubjectID = sr$Slide[ss], imgs=sr[ss, normalizationMarkers], outimgs = sr[ss,normedMarkers], masks = sr[ss,'mask'], offset=offset, nit = 1, nbasisNorm=4, norderNorm=4)
-res = res2
-
-warps = fdaEstimate(normData[,normalizationMarkers], normData$ID, offset = 0.001)
-par(ask = FALSE)
-#plotreg.fd(warps[[1]])
-#warps = fdaEstimate(normData[,normalizationMarkers], normData$ID, offset = 0, transform=function(x) x)
-#plotreg.fd(warps[[4]])
-
-# before and after normalization
-#hist(10^(normData[ normData$ID=='MAP00866_0000_02_02_region1', 'SOX9']), breaks=60)
-#hist(res$normedData[ normData$ID=='MAP00866_0000_02_02_region1', 'SOX9'], breaks=60)
-#hist((res$normedData[ normData$ID=='MAP00866_0000_02_02', 'SOX9']), breaks=60)
-#hist((res$normedData[ normData$ID=='MAP03361_0000_01A_01', 'SOX9']), breaks=60)
-
-#by(normData[,'SOX9'], normData$ID, function(x) hist(x, breaks=60))
-#by(normData[,'SOX9'], normData$ID, function(x) hist(x[x>log10(offset)], breaks=60))
-
-# visualize the transformations
-layout(mat=matrix(1:(length(unique(normData$ID)) *3), nrow=3, byrow=TRUE))
-invisible(by(normData[,normalizationMarkers[1]], normData$ID, function(x) hist(x[x>log10(offset)], breaks = seq(log10(offset), log10(255+offset), length.out=60))))
-invisible(by(res2$normedData[,normalizationMarkers[1]], normData$ID, function(x) hist(x[x>log10(offset)], breaks = seq(min(res2$normedData[,normalizationMarkers[1]]), max(res2$normedData[,normalizationMarkers[1]]), length.out=60)) ) )
-invisible(by(res4$normedData[,normalizationMarkers[1]], normData$ID, function(x) hist(x[x>log10(offset)], breaks = seq(min(res4$normedData[,normalizationMarkers[1]]), max(res4$normedData[,normalizationMarkers[1]]), length.out=60)) ) )
-```
-
-## Spatial Smoothing
-
-Here I use the gaussSmooth function to apply smoothing. It is not actually Gaussian smoothing, because the `raster` package did not have an efficient way to deal with edge effects using Gaussian smoothing, so it's actually homogeneous smoothing on a disk of radius sigma=10, which corresponds to 10 of the original pixel units (I think). This type of smoothing is not ideal.
+Here we use the gaussSmooth function to apply smoothing. It is not actually Gaussian smoothing, because the `raster` package did not have an efficient way to deal with edge effects using Gaussian smoothing, so it's actually homogeneous smoothing on a disk of radius `sigma`.
 It's applied to all of the location markers, which are being used to define broad tissue classes.
 
-There might be code for smoothing.
-I considered using the command line function `c3d` to do smoothing instead, which is likely more efficient and better (https://sourceforge.net/p/c3d/git/ci/master/tree/doc/c3d.md).
-I will modify this to use that instead, when I get a chance.
-Alternatively, we can wrap Python or another function for smoothing.
-
-I smooth on the raw scale because it's less confusing than smoothing on the `log10` transformed scale. I'm not sure what's better.
-Raw scale is more natural with what the downsampling has done already and less confusing in terms of keeping track of the transformations.
-
-So the pipeline is
+The pipeline is:
 
 1. Downsample
 2. Normalize (done here before smoothing)
 3. Smooth
 
-If this is the pipeline the code could be made more efficient.
-
 ```{r smoothing, eval=TRUE}
-sigma=10
-
-#gaussSmooth = function(img, outimg, mask, maskThr, sigma=5, transform=log10, invtransform=function(x) 10^x, offset=1/2, divmean = function(img){ cellStats(img, stat = 'mean')} )
-# smooth on the raw
-# still divides by the mean.
-for(marker in c(locationMarkers)){
-  message(marker)
-  mcmapply(
-    gaussSmooth,
-    img=sr[ss,marker],
-    outimg=sr[ss,paste(marker,'smooth',sep="_")],
-    mask=sr[ss,'mask'],
-    maskThr=dapiThr,
-    MoreArgs=list(sigma=sigma, transform=function(x) x, invtransform=function(x) x, offset=0),
-    mc.cores=4
-  )
-}
-
-# smoothing using c3d
-# for(marker in c(locationMarkers, normedMarkers)){
-#   message(marker)
-#   sigma=20
-#   invisible(mcmapply(gaussSmooth, sr[ss,marker], sr[ss,paste(marker, 'smooth', sep="_")], sr[ss,'mask'], MoreArgs=list(maskThr=dapiThr, sigma=sigma), mc.cores = 4 ))
-# }
+# use smoothing function to loop through sr
+sr3 <- smooth_data(
+  sr2,
+  sigma=50,
+  markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
+  njobs=4
+)
 ```
 
-## Spatial Clusters
+## 4. Spatial Clustering
 
-After smoothing, we then apply clustering. I was going to use NMF, but opted for Kmeans, for whatever reason. That density peak clustering is probably fast and a good option.
+* We subsample at a factor of ``r fact``, so we sample 1/``r fact^2`` of the data on a grid.
+* We used mean division with an offset of ``r offset`` and a `log10` transformation.
+* We also used mean division without a `log10` transformation too.
 
-### Kmeans
-
-* I subsample at a factor of ``r fact``, so I sample 1/``r fact^2`` of the data on a grid.
-* The DAPI image is thresholded larger ``r dapiThr`` to define a tissue mask. This doesn't work real well. I need a mask from Joe created comparing the first and last DAPI images. I think the masks Eliot sent were at a different resolution and I didn't want to deal with it, so I created new masks.
-* I used mean division with an offset of ``r offset`` and a `log10` transformation.
-* I also used mean division without a `log10` transformation too.
-
-This first chunk runs the k-means on the log transformed data.
+This first chunk runs the k-means on the log-transformed data.
 It then uses that model to assign the labels to all of the pixels and writes them out as the `locationLabel` images.
+
 ```{r kmeans, eval=TRUE}
-# extract the smooth un-normalized data from the images
-kMeansMarkers = slocationMarkers
+kMeansMarkers <- paste(locationMarkers, 'smooth', sep="_")
+
 # subsample on grid, within 'mask' to get low number of pixels from each image
-kmeansData = subsampImgs(
-  imgs=sr[ss, kMeansMarkers],
-  masks=sr[ss, 'mask'],
+kmeansData <- subsampImgs(
+  imgs=sr3[ss, kMeansMarkers],
+  masks=sr3[ss, 'mask'],
   maskThr=dapiThr,
   subsamp=fact,
   transform=function(x) x,
   offset=0
 )
-# hist(kmeansData$PANCK_smooth)
+
 kmeansData_sub <- filter(kmeansData,ACTININ_smooth!=kmeansData[30587,1])
 # fit the kmeans model
 X = kmeansData_sub[,kMeansMarkers]
@@ -382,6 +191,7 @@ outimgs = sapply(ss, function(rind){ message(sr$slideRegion[rind]); labelImage(u
 ```
 
 This second chunk runs k-means on the untransformed data and then assigns the values to the `locationLabelUntransformed` images.
+
 ```{r kmeansUntransformed, eval=FALSE}
 # extract the smooth un-normalized data from the images
 kmeansUntransformedData = subsampImgs(sr[ss, kMeansMarkers], sr[ss, 'mask'], maskThr = dapiThr, subsamp = fact, offset=0, transform = function(x) x)

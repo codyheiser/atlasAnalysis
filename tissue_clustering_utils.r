@@ -303,11 +303,13 @@ setup_data <- function(
     sprintf('%s_region_%03d_stroma_mask.png', sr$Slide, sr$Region)
   )
   # check that all the images exist
-  test <- sapply(sr[,allMarkers], file.exists)
+  test <- sapply(sr[,markers], file.exists)
   message(
     paste0(
       sum(test) / (dim(test)[1] * dim(test)[2]) * 100,
-      " % of expected images were found in ",
+      " % of ",
+      (dim(test)[1] * dim(test)[2]),
+      " expected images were found in ",
       wd
     )
   )
@@ -334,37 +336,79 @@ downsample_data <- function(
   #'
   #' @return sr
   origmarkers = sr  # copy object for pulling full-res file names
+  ss = 1:nrow(sr)  # get counter to use in loops
   # downsample markers using average value across pixels
+  message("Downsampling marker images:")
   for(marker in markers){
     sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
-    if(!all(file.exists(sr[ss,marker]))){
-      message(marker)
-      mcmapply(
-        downsample,
-        img=origmarkers[ss,marker],
-        outimg=sr[ss,marker],
-        fact=fact,
-        mask=origmarkers[ss,"mask"],
-        fun="mean",
-        mc.cores=njobs
-      )
-    }
+    message(marker)
+    mcmapply(
+      downsample,
+      img=origmarkers[ss,marker],
+      outimg=sr[ss,marker],
+      fact=fact,
+      mask=origmarkers[ss,"mask"],
+      fun="mean",
+      mc.cores=njobs
+    )
   }
   # downsample masks using mode
+  message("Downsampling image masks:")
   for(marker in masks){
     sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
-    if(!all(file.exists(sr[ss,marker]))){
-      message(marker)
-      mcmapply(
-        downsample,
-        img=origmarkers[ss,marker],
-        outimg=sr[ss,marker],
-        fact=fact,
-        mask=origmarkers[ss,"mask"],
-        fun="modal",
-        mc.cores=njobs
-      )
-    }
+    message(marker)
+    mcmapply(
+      downsample,
+      img=origmarkers[ss,marker],
+      outimg=sr[ss,marker],
+      fact=fact,
+      mask=origmarkers[ss,"mask"],
+      fun="modal",
+      mc.cores=njobs
+    )
   }
+  message("Done!")
+  return(sr)
+}
+
+
+smooth_data <- function(
+  sr,
+  sigma=50,
+  markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
+  njobs=4
+){
+  #' Smooths images in data structure output from `setup_data` or `downsample_data`
+  #'
+  #' @param sr data structure output from `setup_data` or `downsample_data`
+  #' @param sigma radius of circular area to blur each pixel with, in pixels
+  #' @param markers list of markers to smooth
+  #' @param njobs number of CPU cores to use in `mcmapply`
+  #'
+  #' @return sr
+  sMarkers <- paste(markers, 'smooth', sep="_")  # create file names
+  sr[,sMarkers] <- apply(
+    sr[,markers],
+    2,
+    function(x) gsub('\\.tif$', '_smoothed.tif', x)
+  )
+  # smooth the raw data; divides by the mean to normalize, no transformation
+  message("Smoothing marker images:")
+  for(marker in markers){
+    message(marker)
+    mcmapply(
+      gaussSmooth,
+      img=sr[ss,marker],
+      outimg=sr[ss,paste(marker,'smooth',sep="_")],
+      mask=sr[ss,'mask'],
+      maskThr=5,
+      sigma=sigma,
+      transform=function(x) x,
+      invtransform=function(x) x,
+      offset=0,
+      mc.cores=njobs
+    )
+  }
+  message("Done!")
   return(sr)
 }
