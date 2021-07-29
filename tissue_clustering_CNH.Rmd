@@ -5,6 +5,44 @@ date: "7/28/2021"
 output: html_document
 ---
 
+```{r testpipe}
+sr <- tissue_clustering_pipe(
+  wd="~/biostat_clustering/",
+  slides=c(
+  "MAP00083_0000_02_01",
+  "MAP00347_0000_03_02",
+  #"MAP00377_0000_01_01",
+  #"MAP00392_0000_01F_01",
+  #"MAP00411_0000_01A_0",
+  #"MAP00546_0000_02_02",
+  "MAP02112_0000_02_02",
+  "MAP05994_0000_01A_0",
+  "MAP06025_0000_02_01"
+  ),
+  markers=c(
+    "ACTININ",
+    "BCATENIN",
+    "COLLAGEN",
+    "DAPI",
+    "ERBB2",
+    "MUC2",
+    "NAKATPASE",
+    "OLFM4",
+    "PANCK",
+    "PCNA",
+    "SMA",
+    "SOX9",
+    "VIMENTIN"
+  ),
+  fact=8,
+  sigma=50,
+  k=4,
+  njobs=4,
+  overwrite=F,
+  outprefix="clusters"
+)
+```
+
 ```{r setup, include=FALSE}
 knitr::knit_hooks$set(GPs=function(before, options, envir){
   if (before){
@@ -17,13 +55,6 @@ knitr::opts_chunk$set(echo = TRUE, fig.height = 4, fig.width = 4, GPs=TRUE, cach
 
 source("~/git/atlasAnalysis/tissue_clustering_utils.r")
 library(docstring)
-library(parallel)
-library(class)
-library(fda)
-library(lme4)
-library(lmerTest)
-library(emmeans)
-library(sjPlot)
 ```
 
 ## 1. Setup
@@ -37,13 +68,13 @@ wd <- "~/biostat_clustering/"  # working base directory
 # markers to use:
 # These are modifiable. location markers are used for clustering
 locationMarkers <- c(
-  #'ACTININ',
-  #'BCATENIN',
+  'ACTININ',
+  'BCATENIN',
   #'CGA',
   'COLLAGEN',
   #'COX2',
   'DAPI',
-  #'ERBB2',
+  'ERBB2',
   #'GACTIN',
   #'HLAA',
   #'LYSOZYME',
@@ -51,11 +82,11 @@ locationMarkers <- c(
   'NAKATPASE',
   'OLFM4',
   'PANCK',
-  #'PCNA',
+  'PCNA',
   #'PDL1',
   #'PEGFR',
   #'PSTAT3',
-  #'SMA',
+  'SMA',
   #'SNA',
   'SOX9',
   'VIMENTIN'
@@ -77,14 +108,14 @@ immuneMarkers <- c(
 # define slide names in directory structure
 slides <- c(
   "MAP00083_0000_02_01",
-  "MAP00347_0000_03_02"
+  "MAP00347_0000_03_02",
   #"MAP00377_0000_01_01",
   #"MAP00392_0000_01F_01",
   #"MAP00411_0000_01A_0",
   #"MAP00546_0000_02_02",
-  #"MAP02112_0000_02_02",
-  #"MAP05994_0000_01A_0",
-  #"MAP06025_0000_02_01"
+  "MAP02112_0000_02_02",
+  "MAP05994_0000_01A_0",
+  "MAP06025_0000_02_01"
   )
 
 # use data setup function to create sr
@@ -146,7 +177,7 @@ The pipeline is:
 sr3 <- smooth_data(
   sr2,
   sigma=50,
-  markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
+  markers=locationMarkers,
   njobs=4,
   overwrite=F
 )
@@ -161,7 +192,7 @@ sr3 <- smooth_data(
 This first chunk runs the k-means on the log-transformed data.
 It then uses that model to assign the labels to all of the pixels and writes them out as the `locationLabel` images.
 
-```{r kmeans, eval=TRUE}
+```{r kmeansUntransformed, eval=TRUE}
 # image(raster(sr$MUC2[1]))
 kMeansMarkers <- paste(locationMarkers, 'smooth', sep="_")
 
@@ -169,25 +200,25 @@ sr4 <- cluster_data(
   sr3,
   k=4,
   subsamp=8,
-  transform=log10,
-  offset=0.5,
-  markers=kMeansMarkers,
-  seed=NA,
-  out.prefix='locationLabel'
-)
-```
-
-This second chunk runs k-means on the untransformed data and then assigns the values to the `locationLabelUntransformed` images.
-
-```{r kmeansUntransformed, eval=FALSE}
-sr5 <- cluster_data(
-  sr4,
-  k=4,
-  subsamp=8,
   transform=function(x) x,
   offset=0,
   markers=kMeansMarkers,
   seed=NA,
   out.prefix='locationLabelUntransformed'
+)
+```
+
+This second chunk runs k-means on the untransformed data and then assigns the values to the `locationLabelUntransformed` images.
+
+```{r kmeansLog10, eval=FALSE}
+sr5 <- cluster_data(
+  sr4,
+  k=4,
+  subsamp=8,
+  transform=log10,
+  offset=0.5,
+  markers=kMeansMarkers,
+  seed=NA,
+  out.prefix='locationLabel'
 )
 ```

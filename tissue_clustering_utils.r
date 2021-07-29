@@ -2,7 +2,6 @@
 #' @author: C Heiser
 #' adapted from S Vandekar `tissue_clustering.Rmd`
 library(raster)
-set.seed(18)
 
 
 downsample <- function(img, outimg, mask=NULL, fact=10, fun='mean'){
@@ -334,6 +333,7 @@ downsample_data <- function(
   #' @param markers list of markers to downsample
   #' @param masks list of masks to downsample
   #' @param njobs number of CPU cores to use in `mcmapply`
+  #' @param overwrite force overwrite of downsampled files if they already exist
   #'
   #' @return sr
   origmarkers = sr  # copy object for pulling full-res file names
@@ -424,6 +424,7 @@ smooth_data <- function(
   #' @param sigma radius of circular area to blur each pixel with, in pixels
   #' @param markers list of markers to smooth
   #' @param njobs number of CPU cores to use in `mcmapply`
+  #' @param overwrite force overwrite of smoothed files if they already exist
   #'
   #' @return sr
   sMarkers <- paste(markers, 'smooth', sep="_")  # create file names
