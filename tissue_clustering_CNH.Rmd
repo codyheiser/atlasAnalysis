@@ -32,7 +32,7 @@ This first code chunk sets up the data frame `sr` that contains file paths to al
 We need to get a mask from Joe that excludes regions where the tissue came off the slide across the rounds of staining.
 
 ```{r dataSetup, echo=FALSE}
-wd <- "/media/disk2/atlas_mxif/T_cell_quantification/Images_CNH/"  # working base directory
+wd <- "~/biostat_clustering/"  # working base directory
 
 # markers to use:
 # These are modifiable. location markers are used for clustering
@@ -124,15 +124,10 @@ sr2 <- downsample_data(
   sr,
   fact = 8,
   markers = locationMarkers,
-  masks = c("mask","epiMask","strMask","tumorMask"),
-  njobs = 4
+  masks = c("mask"),#,"epiMask","strMask","tumorMask"),
+  njobs = 4,
+  overwrite=F
 )
-
-# SET UP TO DO K-MEANS CLUSTERING:  image(raster(sr$MUC2[1]))
-# location label will be an image containing the tissue classes
-sr2$locationLabel = gsub('DAPI', 'location_label', sr2[,'DAPI'])
-# same, except the input data will be untransformed
-sr2$locationLabelUntransformed = gsub('DAPI', 'location_label_untransformed', sr2[,'DAPI'])
 ```
 
 ## 3. Spatial Smoothing
@@ -152,7 +147,8 @@ sr3 <- smooth_data(
   sr2,
   sigma=50,
   markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
-  njobs=4
+  njobs=4,
+  overwrite=F
 )
 ```
 
@@ -166,44 +162,32 @@ This first chunk runs the k-means on the log-transformed data.
 It then uses that model to assign the labels to all of the pixels and writes them out as the `locationLabel` images.
 
 ```{r kmeans, eval=TRUE}
+# image(raster(sr$MUC2[1]))
 kMeansMarkers <- paste(locationMarkers, 'smooth', sep="_")
 
-# subsample on grid, within 'mask' to get low number of pixels from each image
-kmeansData <- subsampImgs(
-  imgs=sr3[ss, kMeansMarkers],
-  masks=sr3[ss, 'mask'],
-  maskThr=dapiThr,
-  subsamp=fact,
-  transform=function(x) x,
-  offset=0
+sr4 <- cluster_data(
+  sr3,
+  k=4,
+  subsamp=8,
+  transform=log10,
+  offset=0.5,
+  markers=kMeansMarkers,
+  seed=NA,
+  out.prefix='locationLabel'
 )
-
-kmeansData_sub <- filter(kmeansData,ACTININ_smooth!=kmeansData[30587,1])
-# fit the kmeans model
-X = kmeansData_sub[,kMeansMarkers]
-X = apply(X, 2, function(x) ifelse(is.na(x), min(x, na.rm=TRUE), x))
-sds = apply(X, 2, sd)
-X = sweep(X, 2, sds, '/')
-kmeansMod = kmeans(X_sub, k, iter.max = 200, algorithm = 'MacQueen')
-
-### ASSIGN LABELS
-outimgs = sapply(ss, function(rind){ message(sr$slideRegion[rind]); labelImage(unlist(sr[rind,kMeansMarkers]), centers=kmeansMod$centers[,kMeansMarkers], weights=1/sds, mask=sr[rind, 'mask'], maskThr=dapiThr, outname=sr[rind,'locationLabel']) } )
 ```
 
 This second chunk runs k-means on the untransformed data and then assigns the values to the `locationLabelUntransformed` images.
 
 ```{r kmeansUntransformed, eval=FALSE}
-# extract the smooth un-normalized data from the images
-kmeansUntransformedData = subsampImgs(sr[ss, kMeansMarkers], sr[ss, 'mask'], maskThr = dapiThr, subsamp = fact, offset=0, transform = function(x) x)
-
-# fit the kmeans model
-X = kmeansUntransformedData[,kMeansMarkers]
-# Simon's unsure about the purpose of the following line??
-X = apply(X, 2, function(x) ifelse(is.na(x), min(x, na.rm=TRUE), x))
-sds = apply(X, 2, sd)
-X = sweep(X, 2, sds, '/')
-kmeansMod = kmeans(X, k, iter.max = 200, algorithm = 'MacQueen')
-
-### ASSIGN LABELS
-outimgs = sapply(ss, function(rind){ message(sr$slideRegion[rind]); labelImage(unlist(sr[rind,kMeansMarkers]), centers=kmeansMod$centers[,kMeansMarkers], weights=1/sds, mask=sr[rind, 'mask'], maskThr=dapiThr, offset=0, transform=function(x) x, outname=sr[rind,'locationLabelUntransformed']) } )
+sr5 <- cluster_data(
+  sr4,
+  k=4,
+  subsamp=8,
+  transform=function(x) x,
+  offset=0,
+  markers=kMeansMarkers,
+  seed=NA,
+  out.prefix='locationLabelUntransformed'
+)
 ```

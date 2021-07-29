@@ -123,7 +123,7 @@ subsampImgs <- function(
       FUN="&"
     )
     # indsImg selects the pixels that will be used to build the model
-    indsImg = (img>dapiThr & arrIndsImg)
+    indsImg = (img>maskThr & arrIndsImg)
     rm(arrIndsImg, img)
     # for channel
     names(imgnames) = imgnames
@@ -131,15 +131,15 @@ subsampImgs <- function(
       # gets row for this subject
       img = raster(imgs[rind, marker])
       # select target voxels
-      res = values(img)[ values(indsImg) ]
+      res = values(img)[values(indsImg)]
       res = transform(res + offset)
     }, mc.cores = 2 )))
     # set NAs
-    res[ , imgnames[which(!imgnames %in% names(res)) ] ] = NA
+    res[, imgnames[which(!imgnames %in% names(res))]] = NA
     # reorder them to be the original
-    res = res[ ,imgnames]
+    res = res[, imgnames]
     # return result for this slideRegion
-    res[,'ID'] = rownames(imgs)[rind]
+    res[, 'ID'] = rownames(imgs)[rind]
     res
   }
   ) ) # combine them all into one data frame
@@ -324,7 +324,8 @@ downsample_data <- function(
   fact=8,
   markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
   masks=c("mask","epiMask","strMask","tumorMask"),
-  njobs=4
+  njobs=4,
+  overwrite=T
 ){
   #' Downsamples images in data structure output from `setup_data`
   #'
@@ -341,33 +342,71 @@ downsample_data <- function(
   message("Downsampling marker images:")
   for(marker in markers){
     sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
-    message(marker)
-    mcmapply(
-      downsample,
-      img=origmarkers[ss,marker],
-      outimg=sr[ss,marker],
-      fact=fact,
-      mask=origmarkers[ss,"mask"],
-      fun="mean",
-      mc.cores=njobs
-    )
+    if(!overwrite){
+      if(!all(file.exists(sr[ss,marker]))){
+        message(marker)
+        mcmapply(
+          downsample,
+          img=origmarkers[ss,marker],
+          outimg=sr[ss,marker],
+          MoreArgs=list(
+            fact=fact,
+            mask=origmarkers[ss,"mask"],
+            fun="mean"
+          ),
+          mc.cores=njobs
+        )
+      }
+    }else{
+      message(marker)
+      mcmapply(
+        downsample,
+        img=origmarkers[ss,marker],
+        outimg=sr[ss,marker],
+        MoreArgs=list(
+          fact=fact,
+          mask=origmarkers[ss,"mask"],
+          fun="mean"
+        ),
+        mc.cores=njobs
+      )
+    }
   }
   # downsample masks using mode
   message("Downsampling image masks:")
   for(marker in masks){
     sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
-    message(marker)
-    mcmapply(
-      downsample,
-      img=origmarkers[ss,marker],
-      outimg=sr[ss,marker],
-      fact=fact,
-      mask=origmarkers[ss,"mask"],
-      fun="modal",
-      mc.cores=njobs
-    )
+    if(!overwrite){
+      if(!all(file.exists(sr[ss,marker]))){
+        message(marker)
+        mcmapply(
+          downsample,
+          img=origmarkers[ss,marker],
+          outimg=sr[ss,marker],
+          MoreArgs=list(
+            fact=fact,
+            mask=origmarkers[ss,"mask"],
+            fun="modal"
+          ),
+          mc.cores=njobs
+        )
+      }
+    }else{
+      message(marker)
+      mcmapply(
+        downsample,
+        img=origmarkers[ss,marker],
+        outimg=sr[ss,marker],
+        MoreArgs=list(
+          fact=fact,
+          mask=origmarkers[ss,"mask"],
+          fun="modal"
+        ),
+        mc.cores=njobs
+      )
+    }
   }
-  message("Done!")
+  message("\nDone!")
   return(sr)
 }
 
@@ -376,7 +415,8 @@ smooth_data <- function(
   sr,
   sigma=50,
   markers=c("COLLAGEN","DAPI","MUC2","NAKATPASE","OLFM4","PANCK","SOX9","VIMENTIN"),
-  njobs=4
+  njobs=4,
+  overwrite=T
 ){
   #' Smooths images in data structure output from `setup_data` or `downsample_data`
   #'
@@ -392,23 +432,125 @@ smooth_data <- function(
     2,
     function(x) gsub('\\.tif$', '_smoothed.tif', x)
   )
+  ss = 1:nrow(sr)  # get counter to use in loops
   # smooth the raw data; divides by the mean to normalize, no transformation
   message("Smoothing marker images:")
   for(marker in markers){
-    message(marker)
-    mcmapply(
-      gaussSmooth,
-      img=sr[ss,marker],
-      outimg=sr[ss,paste(marker,'smooth',sep="_")],
-      mask=sr[ss,'mask'],
-      maskThr=5,
-      sigma=sigma,
-      transform=function(x) x,
-      invtransform=function(x) x,
-      offset=0,
-      mc.cores=njobs
-    )
+    if(!overwrite){
+      if(!all(file.exists(sr[ss,marker]))){
+        message(marker)
+        mcmapply(
+          gaussSmooth,
+          img=sr[ss,marker],
+          outimg=sr[ss,paste(marker,'smooth',sep="_")],
+          mask=sr[ss,'mask'],
+          MoreArgs=list(
+            maskThr=5,
+            sigma=sigma,
+            transform=function(x) x,
+            invtransform=function(x) x,
+            offset=0
+          ),
+          mc.cores=njobs
+        )
+      }
+    }else{
+      message(marker)
+      mcmapply(
+        gaussSmooth,
+        img=sr[ss,marker],
+        outimg=sr[ss,paste(marker,'smooth',sep="_")],
+        mask=sr[ss,'mask'],
+        MoreArgs=list(
+          maskThr=5,
+          sigma=sigma,
+          transform=function(x) x,
+          invtransform=function(x) x,
+          offset=0
+        ),
+        mc.cores=njobs
+      )
+    }
   }
-  message("Done!")
+  message("\nDone!")
+  return(sr)
+}
+
+
+cluster_data <- function(
+  sr,
+  k=4,
+  subsamp=8,
+  transform=function(x) x,
+  offset=0,
+  markers=c(
+    "COLLAGEN_smooth",
+    "DAPI_smooth",
+    "MUC2_smooth",
+    "NAKATPASE_smooth",
+    "OLFM4_smooth",
+    "PANCK_smooth",
+    "SOX9_smooth",
+    "VIMENTIN_smooth"
+  ),
+  seed=NA,
+  out.prefix='locationLabel'
+){
+  #' Identifies and labels k-means clusters using data structure output from 
+  #' `setup_data`, `downsample_data` or `smooth_data`
+  #'
+  #' @param sr data structure output from `setup_data`, `downsample_data` or 
+  #' `smooth_data`
+  #' @param k number of clusters for k-means model
+  #' @param subsamp ratio of total clusters from training images to subsample on grid 
+  #' for k-means training
+  #' @param transform function to transform pixel values with prior to k-means
+  #' @param offset pseudovalue to add prior to transform to avoid `transform`(0)
+  #' @param markers list of markers to use for k-means model building
+  #' @param seed random seed for k-means model
+  #' @param out.prefix how to name the output cluster label files
+  #'
+  #' @return sr
+  sr[,paste(out.prefix)] = gsub('DAPI', out.prefix, sr[,'DAPI'])
+  ss = 1:nrow(sr)  # get counter to use in loops
+  # subsample on grid, within 'mask' to get low number of pixels from each image
+  message("Downsampling pixels for k-means training")
+  kmeansData <- subsampImgs(
+    imgs=sr[ss, markers],
+    masks=sr[ss, 'mask'],
+    maskThr=5,
+    subsamp=subsamp,
+    transform=transform,
+    offset=offset
+  )
+  message("Fitting k-means model")
+  # fit the kmeans model
+  if(!is.na(seed)){
+    set.seed(seed)
+  }
+  X = kmeansData[,markers]
+  #X = apply(X, 2, function(x) ifelse(is.na(x), min(x, na.rm=TRUE), x))
+  sds = apply(X, 2, sd)
+  X = sweep(X, 2, sds, '/')
+  kmeansMod = kmeans(X, k, iter.max=200, algorithm='MacQueen')
+  # assign k-means labels
+  message("Assigning k-means labels")
+  outimgs <- sapply(
+    ss,
+    function(rind){
+      message(sr$slideRegion[rind])
+      labelImage(
+        unlist(sr[rind,markers]),
+        centers=kmeansMod$centers[,markers],
+        weights=1/sds,
+        mask=sr[rind, 'mask'],
+        maskThr=5,
+        transform=transform,
+        offset=offset,
+        outname=sr[rind,out.prefix]
+      )
+    }
+  )
+  message("\nDone!")
   return(sr)
 }
