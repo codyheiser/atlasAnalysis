@@ -5,44 +5,6 @@ date: "7/28/2021"
 output: html_document
 ---
 
-```{r testpipe}
-sr <- tissue_clustering_pipe(
-  wd="~/biostat_clustering/",
-  slides=c(
-  "MAP00083_0000_02_01",
-  "MAP00347_0000_03_02",
-  #"MAP00377_0000_01_01",
-  #"MAP00392_0000_01F_01",
-  #"MAP00411_0000_01A_0",
-  #"MAP00546_0000_02_02",
-  "MAP02112_0000_02_02",
-  "MAP05994_0000_01A_0",
-  "MAP06025_0000_02_01"
-  ),
-  markers=c(
-    "ACTININ",
-    "BCATENIN",
-    "COLLAGEN",
-    "DAPI",
-    "ERBB2",
-    "MUC2",
-    "NAKATPASE",
-    "OLFM4",
-    "PANCK",
-    "PCNA",
-    "SMA",
-    "SOX9",
-    "VIMENTIN"
-  ),
-  fact=8,
-  sigma=50,
-  k=4,
-  njobs=4,
-  overwrite=F,
-  outprefix="clusters"
-)
-```
-
 ```{r setup, include=FALSE}
 knitr::knit_hooks$set(GPs=function(before, options, envir){
   if (before){
@@ -220,5 +182,57 @@ sr5 <- cluster_data(
   markers=kMeansMarkers,
   seed=NA,
   out.prefix='locationLabel'
+)
+```
+
+## 5. Entire Pipeline
+
+I've wrapped the entire pipeline, including downsampling, smoothing, and k-means clustering into a master function and script.
+
+You can run from command line:
+```
+Rscript ~/git/atlasAnalysis/tissue_clustering_pipeline.r . MAP00083_0000_02_01 MAP00347_0000_03_02 MAP02112_0000_02_02 MAP05994_0000_01A_0 MAP06025_0000_02_01
+```
+
+```{r testpipe}
+sr <- tissue_clustering_pipe(
+  wd="~/biostat_clustering/",
+  slides=c(
+  "MAP00083_0000_02_01",
+  "MAP00347_0000_03_02",
+  "MAP02112_0000_02_02",
+  "MAP05994_0000_01A_0",
+  "MAP06025_0000_02_01"
+  ),
+  markers=c(
+  'ACTININ',
+  'BCATENIN',
+  #'CGA',
+  'COLLAGEN',
+  #'COX2',
+  'DAPI',
+  'ERBB2',
+  #'GACTIN',
+  #'HLAA',
+  #'LYSOZYME',
+  'MUC2',
+  'NAKATPASE',
+  'OLFM4',
+  'PANCK',
+  'PCNA',
+  #'PDL1',
+  #'PEGFR',
+  #'PSTAT3',
+  'SMA',
+  'SNA',
+  'SOX9',
+  'VIMENTIN'
+  ),
+  fact=10,
+  sigma=50,
+  k=4,
+  njobs=4,
+  overwrite=T,
+  outprefix="clusters"
 )
 ```

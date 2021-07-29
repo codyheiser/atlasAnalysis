@@ -1,7 +1,9 @@
 #' Tissue Clustering Utility Functions
 #' @author: C Heiser
 #' adapted from S Vandekar `tissue_clustering.Rmd`
-library(raster)
+suppressPackageStartupMessages(require(class))
+suppressPackageStartupMessages(require(raster))
+suppressPackageStartupMessages(require(parallel))
 
 
 downsample <- function(img, outimg, mask=NULL, fact=10, fun='mean'){
