@@ -1,0 +1,197 @@
+---
+title: "clustering"
+author: "Coleman Harris"
+date: "7/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(EBImage)
+library(parallel)
+library(raster)
+library(stringr)
+```
+
+## Functions
+- Q1: Removing images without a tumor mask removes a lot of data (~half of the images).
+- Q2: Why downsample differently for masks/pos and images (e.g. the mode and mean steps)?
+
+```{r}
+## function to return dataframe with metadata and image locations
+getImages = function(locationMarkers, immuneMarkers, slides){
+  immunePosMarkers = paste0(immuneMarkers, 'pos')
+  allMarkers = c('DAPI', immuneMarkers, locationMarkers)
+  
+  thresholdValues <- list()
+  for(i in 1:length(slides)){
+    thresholdValues[[i]] <- read.csv(sprintf('/media/disk2/atlas_mxif/T_cell_quantification/Images/%s/%s_thresholds.csv',
+                                       slides[i],
+                                       slides[i]))
+  }
+  
+  ## organize thresholds df
+  thresholdValues <- do.call(rbind,thresholdValues) ## combine list of all threshold values
+  thresholdValues <- thresholdValues[-which(thresholdValues$Threshold==0),] ## remove zeroes
+  thresholdValues$slideRegion <- sprintf('%s_region%s',thresholdValues$Slide,thresholdValues$Region) ## add slideRegion col
+  
+  ## setup slideRegion dataframe
+  slideRegion = thresholdValues[!duplicated(thresholdValues$slideRegion), c('Slide', 'Region', 'slideRegion')] ## remove duplicate slideRegions, subset columns
+  
+  ## loop through all markers to add to dataframe
+  addedMarkers = list()
+  for(i in 1:length(allMarkers)){
+    ## add all markers to dataset
+    temp_data = cbind(slideRegion, 
+                      allMarkers[i],
+                      file.path('/media/disk2/atlas_mxif/T_cell_quantification/Images/Adjusted Images', 
+                                slideRegion$Slide, 
+                                sprintf('%s_ADJ_region_%03d.tif',
+                                allMarkers[i], 
+                                slideRegion$Region) ),deparse.level = 0)
+    colnames(temp_data)[4:5] = c("marker","imageLoc") 
+    
+    ## if immune marker, add threshold image
+    if(allMarkers[i] %in% immuneMarkers){
+      immune_temp_data = cbind(slideRegion,
+                              paste0(allMarkers[i],"pos"),
+                              file.path('/media/disk2/atlas_mxif/T_cell_quantification/Images/', 
+                                    slideRegion$Slide, 
+                                    sprintf('%s_region_%03d_threshold.png', 
+                                    allMarkers[i], slideRegion$Region) ) 
+                              )
+      colnames(immune_temp_data)[4:5] = c("marker","imageLoc")
+      temp_data = rbind(temp_data,immune_temp_data)
+    }
+    
+    addedMarkers[[i]] = temp_data
+  }
+  
+  ## combine all markers into dataframe
+  slideRegion = do.call(rbind, addedMarkers)
+  
+  ## add masks
+  slideRegion[,'mask'] = file.path('/media/disk2/atlas_mxif/T_cell_quantification/Images/Adjusted Images', slideRegion$Slide, sprintf('%s_%02d_TISSUE_MASK.tif', slideRegion$Slide, slideRegion$Region) )
+  slideRegion[,'tumorMask'] = file.path('/media/disk2/atlas_mxif/T_cell_quantification/Images/BALANCED', slideRegion$Slide, sprintf('Tumor_mask_region_%03d.png', slideRegion$Region) )
+  slideRegion[,'epiMask'] = file.path('/media/disk2/atlas_mxif/T_cell_quantification/Images/', slideRegion$Slide, sprintf('%s_region_%03d_epi_mask.png', slideRegion$Slide, slideRegion$Region) )
+  slideRegion[,'strMask'] = file.path('/media/disk2/atlas_mxif/T_cell_quantification/Images/', slideRegion$Slide, sprintf('%s_region_%03d_stroma_mask.png', slideRegion$Slide, slideRegion$Region) )
+  
+  ## add tissue info
+  tts = read.csv('/media/disk2/atlas_mxif/data/TissueSubTypes Colon Map.csv')
+  # match capitalization
+  names(tts)[1] = 'TissueID'
+  slideRegion$TissueID = slideRegion$Slide
+  slideRegion = merge(slideRegion, tts, all.x=TRUE)
+  
+  ## add more tissue classes as col
+  slideRegion$adenSSLcrc = ifelse(slideRegion$tissueSubType %in% c('Tub', 'TV'), 'adenoma', 
+                       ifelse(slideRegion$tissueSubType %in% c('HP', 'HP/SSL', 'SSL', 'Tub/SSL'), 'SSL', 
+                              ifelse(slideRegion$tissueSubType %in% c('CRC'), 'CRC', NA )) )
+  
+  ## subset by masks that exist
+  slideRegion = slideRegion[file.exists(slideRegion$mask),]
+  slideRegion = slideRegion[ file.exists(slideRegion$tumorMask),]
+  
+  # checks that mask image matches dimensions of DAPI image (some didn't)
+  ## print regions where dims don't match
+  message(paste0("Mask & DAPI dimensions don't match: ", slideRegion[slideRegion$marker=="DAPI",][which(!apply(slideRegion[slideRegion$marker=="DAPI",], 1, function(x) all(dim(raster(x['mask'])) == dim(raster(x['imageLoc']))) )),]$slideRegion," \n"))
+  
+  ## add pos label
+  #slideRegion$posMarker = !grepl("pos",slideRegion$marker)
+  
+  return(slideRegion)
+}
+
+## function to downsample an image
+downsampleImage = function(img,outputFile,mask=NULL,func="mean",factor=8,method="simon"){
+  ## if using simon's method
+  if(method=="simon"){
+      ## load in image if necessary
+      if(is.character(img)){
+        img = raster(img)
+      }
+      if(!is.null(mask)){
+        if(is.character(mask)) mask = raster(mask)
+          if(all(dim(img)==ceiling(dim(mask)/2))){
+            mask = aggregate(mask, fact=2, fun=fun)
+            fact = fact/2
+            extent(img) = extent(mask)
+        }
+      }
+    retImage = aggregate(img, fact=factor, fun=func, filename=outputFile, overwrite=TRUE)
+  }
+  else if(method=="resize"){
+    img = readImage(img)
+    retImage = resize(img,w=round(dim(img)[2]/factor),filter="none")
+    writeImage(retImage,outputFile)
+  }
+}
+```
+
+
+## Setup dataframe
+
+```{r}
+locationMarkers = c('PANCK', 'COLLAGEN', 'VIMENTIN', 'SOX9', 'NAKATPASE')
+immuneMarkers = c('CD3D', 'CD8', 'CD4', 'CD68')
+
+slides <- c('MAP00083_0000_02_01','MAP00347_0000_03_02','MAP00377_0000_01_01',
+            'MAP00392_0000_01F_01','MAP00411_0000_01A_0','MAP00546_0000_02_02',
+            "MAP00696_0000_01_01","MAP00866_0000_02_02","MAP01391_0000_01_01",
+            "MAP01938_0000_0E_01","MAP02112_0000_02_02","MAP02235_0000_03_04",
+            "MAP02487_0000_01_01","MAP02951_0000_02_02","MAP03077_0000_01_01",
+            "MAP03252_0000_06_04","MAP03331_0000_01_01","MAP03361_0000_01A_01",
+            "MAP03410_0000_06A_02","MAP04255_0000_02_02","MAP04781_0000_01_01",
+            "MAP04814_0000_01_03","MAP05212_0000_01_01","MAP05216_0000_01_01",
+            "MAP05363_0000_06_04","MAP05994_0000_01A_0","MAP06025_0000_02_01",
+            "MAP06134_0000_01_01","MAP06147_0000_03_03","MAP06310_0000_02_03")
+
+slideRegion = getImages(locationMarkers,immuneMarkers,slides)
+```
+
+## Downsampling
+
+```{r}
+## adjust image names
+slideRegion$downsampledImageLoc = gsub("\\.png","_downsampled_CRH\\.png",slideRegion$imageLoc)
+slideRegion$downsampledImageLoc = gsub("\\.tif","_downsampled_CRH\\.tif",slideRegion$downsampledImageLoc)
+slideRegion$downsampledMaskLoc = gsub("\\.tif","_downsampled_CRH\\.tif",slideRegion$mask)
+
+## downsample images
+mclapply(1:nrow(slideRegion), function(i){
+  if(is.na(str_match(slideRegion[i,]$imageLoc,"\\.png"))){        
+    ## run for Image
+    downsampleImage(img=slideRegion[i,]$imageLoc,
+                    outputFile=slideRegion[i,]$downsampledImageLoc,
+                    mask=slideRegion[i,]$mask)
+  }else{ 
+    ## run for Pos                                                       
+    downsampleImage(img=slideRegion[i,]$imageLoc,
+                    outputFile=slideRegion[i,]$downsampledImageLoc,
+                    mask=slideRegion[i,]$mask,
+                    func = "modal")
+  }
+  ## run for Mask                                                      
+  downsampleImage(img=slideRegion[i,]$mask,
+                  outputFile=slideRegion[i,]$downsampledMaskLoc,
+                  func = "modal")}
+  ,
+  mc.cores=24)
+```
+
+## Normalization
+
+```{r}
+## calculate slide means for each slide, marker
+slideMeans = generateSlideMeans()
+
+## normalize images
+mclapply(1:nrow(slideRegion), function(i){
+  if(is.na(str_match(slideRegion[i,]$imageLoc,"\\.png"))){        
+    ## run for Image
+    normalizeImage(...)
+  }}
+  ,
+  mc.cores=24)
+```
+
