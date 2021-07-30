@@ -94,6 +94,7 @@ if(!interactive()){
   parser$add_argument(
     "slides",
     nargs="+",
+    type="character",
     help="Names of slides to use for clustering"
   )
   parser$add_argument(
@@ -101,6 +102,7 @@ if(!interactive()){
     "--markers",
     dest="markers",
     nargs="+",
+    type="character",
     default=c(
       "ACTININ",
       "BCATENIN",
@@ -122,6 +124,7 @@ if(!interactive()){
     "-d",
     "--downsample-factor",
     dest="downsamplefactor",
+    type="integer",
     default=8,
     help="Factor in pixels by which to downsample images"
   )
@@ -129,6 +132,7 @@ if(!interactive()){
     "-s",
     "--sigma",
     dest="sigma",
+    type="integer",
     default=50,
     help="Radius of disk in pixels used to smooth downsampled images"
   )
@@ -136,6 +140,7 @@ if(!interactive()){
     "-k",
     "--k-clusters",
     dest="k",
+    type="integer",
     default=4,
     help="Number of k-means clusters"
   )
@@ -143,6 +148,7 @@ if(!interactive()){
     "-j",
     "--n-jobs",
     dest="njobs",
+    type="integer",
     default=4,
     help="Number of CPU cores to use for parallelization"
   )
@@ -150,6 +156,7 @@ if(!interactive()){
     "-p",
     "--prefix",
     dest="prefix",
+    type="character",
     default="clusters",
     help="Prefix to cluster-labeled image files written out"
   )
