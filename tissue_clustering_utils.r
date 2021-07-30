@@ -4,9 +4,10 @@
 suppressPackageStartupMessages(require(class))
 suppressPackageStartupMessages(require(raster))
 suppressPackageStartupMessages(require(parallel))
+suppressPackageStartupMessages(require(EBImage))
 
 
-downsample <- function(img, outimg, mask=NULL, fact=10, fun='mean'){
+downsample <- function(img, outimg, mask=NULL, fact=10, fun='mean',method="simon"){
   #' Downsamples image
   #'
   #' @param img image to downsample as filepath or raster
@@ -15,22 +16,29 @@ downsample <- function(img, outimg, mask=NULL, fact=10, fun='mean'){
   #' prior to downsampling
   #' @param fact factor to downsample by in x and y pixel directions
   #' @param fun function to pass to `aggregate` to downsample pixels
+  #' @param method identifies which downsampling method to use
   #'
   #' @return ans writes downsampled `img` to `outimg`
-  if(is.character(img)){
-    message(basename(img))
-    img = raster(img)
-  }
-  if(!is.null(mask)){
-    if(is.character(mask)) mask = raster(mask)
-    if(all(dim(img)==ceiling(dim(mask)/2))){
-      mask = aggregate(mask, fact=2, fun=fun)
-      fact = fact/2
-      extent(img) = extent(mask)
+  if(method == "simon"){
+    if(is.character(img)){
+      message(basename(img))
+      img = raster(img)
     }
+    if(!is.null(mask)){
+      if(is.character(mask)) mask = raster(mask)
+      if(all(dim(img)==ceiling(dim(mask)/2))){
+        mask = aggregate(mask, fact=2, fun=fun)
+        fact = fact/2
+        extent(img) = extent(mask)
+      }
+    }
+    ans = aggregate(img, fact=fact, fun=fun, filename=outimg, overwrite=TRUE)
   }
-  ans = aggregate(img, fact=fact, fun=fun, filename=outimg, overwrite=TRUE)
-  ans = outimg
+  else if(method == "resize"){
+    img = readImage(img)
+    ans = resize(img,w=round(dim(img)[2]/fact),filter="none")
+    writeImage(ans,outimg)
+  }
 }
 
 
