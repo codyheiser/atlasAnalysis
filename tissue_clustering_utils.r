@@ -2,8 +2,8 @@
 #' @author: C Heiser
 #' adapted from S Vandekar `tissue_clustering.Rmd`
 suppressPackageStartupMessages(require(class))
-suppressPackageStartupMessages(require(raster))
 suppressPackageStartupMessages(require(parallel))
+suppressPackageStartupMessages(require(raster))
 
 
 downsample <- function(img, outimg, mask=NULL, fact=10, fun='mean'){
