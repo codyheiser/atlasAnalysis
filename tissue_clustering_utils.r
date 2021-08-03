@@ -338,12 +338,12 @@ downsample_data <- function(
   #' @param overwrite force overwrite of downsampled files if they already exist
   #'
   #' @return sr
-  origmarkers = sr  # copy object for pulling full-res file names
-  ss = 1:nrow(sr)  # get counter to use in loops
+  origmarkers <- sr  # copy object for pulling full-res file names
+  ss <- 1:nrow(sr)  # get counter to use in loops
   # downsample markers using average value across pixels
   message("Downsampling marker images:")
   for(marker in markers){
-    sr[,marker] = gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
+    sr[,marker] <- gsub('\\.png$|\\.tif$', '_downsampled.tif', origmarkers[,marker])
     if(!overwrite){
       if(!all(file.exists(sr[ss,marker]))){
         message(marker)
@@ -353,7 +353,7 @@ downsample_data <- function(
           outimg=sr[ss,marker],
           MoreArgs=list(
             fact=fact,
-            mask=origmarkers[ss,"mask"],
+            mask=NULL,
             fun="mean"
           ),
           mc.cores=njobs
@@ -367,7 +367,7 @@ downsample_data <- function(
         outimg=sr[ss,marker],
         MoreArgs=list(
           fact=fact,
-          mask=origmarkers[ss,"mask"],
+          mask=NULL,
           fun="mean"
         ),
         mc.cores=njobs
@@ -387,7 +387,7 @@ downsample_data <- function(
           outimg=sr[ss,marker],
           MoreArgs=list(
             fact=fact,
-            mask=origmarkers[ss,"mask"],
+            mask=NULL,
             fun="modal"
           ),
           mc.cores=njobs
@@ -401,7 +401,7 @@ downsample_data <- function(
         outimg=sr[ss,marker],
         MoreArgs=list(
           fact=fact,
-          mask=origmarkers[ss,"mask"],
+          mask=NULL,
           fun="modal"
         ),
         mc.cores=njobs
@@ -499,13 +499,13 @@ cluster_data <- function(
   seed=NA,
   out.prefix='locationLabel'
 ){
-  #' Identifies and labels k-means clusters using data structure output from 
+  #' Identifies and labels k-means clusters using data structure output from
   #' `setup_data`, `downsample_data` or `smooth_data`
   #'
-  #' @param sr data structure output from `setup_data`, `downsample_data` or 
+  #' @param sr data structure output from `setup_data`, `downsample_data` or
   #' `smooth_data`
   #' @param k number of clusters for k-means model
-  #' @param subsamp ratio of total clusters from training images to subsample on grid 
+  #' @param subsamp ratio of total clusters from training images to subsample on grid
   #' for k-means training
   #' @param transform function to transform pixel values with prior to k-means
   #' @param offset pseudovalue to add prior to transform to avoid `transform`(0)

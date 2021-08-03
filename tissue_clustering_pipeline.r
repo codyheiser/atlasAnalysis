@@ -2,7 +2,7 @@
 #' @author: C Heiser
 suppressPackageStartupMessages(require(argparse))
 suppressPackageStartupMessages(require(dplyr))
-suppressPackageStartupMessages(source("~/git/atlasAnalysis/tissue_clustering_utils.r"))
+suppressPackageStartupMessages(source("tissue_clustering_utils.r"))
 
 
 tissue_clustering_pipe <- function(
@@ -39,7 +39,7 @@ tissue_clustering_pipe <- function(
   #' @param sigma radius of circular area to blur each pixel with, in pixels
   #' @param k number of clusters for k-means model
   #' @param njobs number of CPU cores to use in `mcmapply`
-  #' @param overwrite force overwrite of downsampled/smoothed files if they already 
+  #' @param overwrite force overwrite of downsampled/smoothed files if they already
   #' exist
   #' @param out.prefix how to name the output cluster label files
   #'
@@ -67,7 +67,7 @@ tissue_clustering_pipe <- function(
     overwrite = overwrite
   ) -> sr
   # get names of smoothed markers for k-means
-  kMeansMarkers <- paste(markers, 'smooth', sep="_")
+  kMeansMarkers <- paste(markers, "smooth", sep="_")
   # perform k-means clustering
   cluster_data(
     sr,
@@ -84,7 +84,7 @@ tissue_clustering_pipe <- function(
 
 if(!interactive()){
   parser <- ArgumentParser(
-    description='Perform pixel-level clustering of tissue regions from MxIF data'
+    description="Perform pixel-level clustering of tissue regions from MxIF data"
   )
   parser$add_argument(
     "wd",
@@ -168,7 +168,7 @@ if(!interactive()){
     help="Force overwrite of all downsampled and smoothed images before clustering"
   )
   args <- parser$parse_args()
-  
+
   sr <- tissue_clustering_pipe(
     wd=args$wd,
     slides=args$slides,

@@ -15,7 +15,7 @@ knitr::knit_hooks$set(GPs=function(before, options, envir){
 })
 knitr::opts_chunk$set(echo = TRUE, fig.height = 4, fig.width = 4, GPs=TRUE, cache=TRUE, cache.lazy = FALSE)
 
-source("~/git/atlasAnalysis/tissue_clustering_utils.r")
+source("tissue_clustering_utils.r")
 library(docstring)
 ```
 
@@ -25,59 +25,59 @@ This first code chunk sets up the data frame `sr` that contains file paths to al
 We need to get a mask from Joe that excludes regions where the tissue came off the slide across the rounds of staining.
 
 ```{r dataSetup, echo=FALSE}
-wd <- "~/biostat_clustering/"  # working base directory
+wd <- "/media/disk2/atlas_mxif/T_cell_quantification/Images_CNH"  # working base directory
 
 # markers to use:
 # These are modifiable. location markers are used for clustering
 locationMarkers <- c(
-  'ACTININ',
-  'BCATENIN',
-  #'CGA',
-  'COLLAGEN',
-  #'COX2',
-  'DAPI',
-  'ERBB2',
-  #'GACTIN',
-  #'HLAA',
-  #'LYSOZYME',
-  'MUC2',
-  'NAKATPASE',
-  'OLFM4',
-  'PANCK',
-  'PCNA',
-  #'PDL1',
-  #'PEGFR',
-  #'PSTAT3',
-  'SMA',
-  #'SNA',
-  'SOX9',
-  'VIMENTIN'
+  "ACTININ",
+  "BCATENIN",
+  #"CGA",
+  "COLLAGEN",
+  #"COX2",
+  "DAPI",
+  "ERBB2",
+  #"GACTIN",
+  #"HLAA",
+  #"LYSOZYME",
+  "MUC2",
+  "NAKATPASE",
+  "OLFM4",
+  "PANCK",
+  "PCNA",
+  #"PDL1",
+  #"PEGFR",
+  #"PSTAT3",
+  "SMA",
+  #"SNA",
+  "SOX9",
+  "VIMENTIN"
   )
 
 # immune markers for downstream tissue infiltration analysis
 immuneMarkers <- c(
-  #'FOXP3',
-  #'CD3D',
-  #'CD4',
-  #'CD8',
-  #'CD11B',
-  #'CD20',
-  #'CD45',
-  #'CD45B',
-  #'CD68'
+  #"FOXP3",
+  #"CD3D",
+  #"CD4",
+  #"CD8",
+  #"CD11B",
+  #"CD20",
+  #"CD45",
+  #"CD45B",
+  #"CD68"
   )
 
 # define slide names in directory structure
 slides <- c(
   "MAP00083_0000_02_01",
   "MAP00347_0000_03_02",
-  #"MAP00377_0000_01_01",
-  #"MAP00392_0000_01F_01",
-  #"MAP00411_0000_01A_0",
+  "MAP00377_0000_01_01",
+  "MAP00392_0000_01F_01",
+  "MAP00411_0000_01A_0",
   #"MAP00546_0000_02_02",
-  "MAP02112_0000_02_02",
-  "MAP05994_0000_01A_0",
-  "MAP06025_0000_02_01"
+  "MAP02112_0000_02_02"
+  #"MAP05994_0000_01A_0",
+  #"MAP06025_0000_02_01"
   )
 
 # use data setup function to create sr
@@ -119,7 +119,7 @@ sr2 <- downsample_data(
   markers = locationMarkers,
   masks = c("mask"),#,"epiMask","strMask","tumorMask"),
   njobs = 4,
-  overwrite=F
+  overwrite=T
 )
 ```
 
