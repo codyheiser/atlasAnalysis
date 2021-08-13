@@ -280,7 +280,7 @@ setup_data <- function(
     function(m) file.path(
       wd,
       sr$Slide,
-      sprintf('%s_ADJ_region_%03d.tif', m, sr$Region)
+      sprintf('%s_%s_region_%03d.tif', sr$Slide, m, sr$Region)
     )
   )
   sr[,'mask'] <- file.path(

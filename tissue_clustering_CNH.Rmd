@@ -16,7 +16,6 @@ knitr::knit_hooks$set(GPs=function(before, options, envir){
 knitr::opts_chunk$set(echo = TRUE, fig.height = 4, fig.width = 4, GPs=TRUE, cache=TRUE, cache.lazy = FALSE)
 
 source("tissue_clustering_utils.r")
-library(docstring)
 ```
 
 ## 1. Setup
@@ -25,11 +24,12 @@ This first code chunk sets up the data frame `sr` that contains file paths to al
 We need to get a mask from Joe that excludes regions where the tissue came off the slide across the rounds of staining.
 
 ```{r dataSetup, echo=FALSE}
-wd <- "/media/disk2/atlas_mxif/T_cell_quantification/Images_CNH"  # working base directory
+wd <- "~/biostat_clustering/"  # working base directory
 
 # markers to use:
 # These are modifiable. location markers are used for clustering
 locationMarkers <- c(
+  "ACTG1",
   "ACTININ",
   "BCATENIN",
   #"CGA",
@@ -69,15 +69,53 @@ immuneMarkers <- c(
 
 # define slide names in directory structure
 slides <- c(
-  "MAP00083_0000_02_01",
-  "MAP00347_0000_03_02",
-  "MAP00377_0000_01_01",
-  "MAP00392_0000_01F_01",
-  "MAP00411_0000_01A_0",
+  #"MAP00083_0000_02_01",
+  #"MAP00347_0000_03_02",
+  #"MAP00377_0000_01_01",
+  #"MAP00392_0000_01F_01",
+  #"MAP00411_0000_01A_0",
   #"MAP00546_0000_02_02",
-  "MAP02112_0000_02_02"
+  #"MAP02112_0000_02_02",
   #"MAP05994_0000_01A_0",
-  #"MAP06025_0000_02_01"
+  #"MAP06025_0000_02_01",
+  "WD86056_r01_c02",
+  "WD86056_r01_c03",
+  #"WD86056_r01_c04",
+  "WD86056_r02_c02",
+  "WD86056_r02_c03",
+  "WD86056_r02_c04",
+  "WD86056_r02_c05",
+  "WD86056_r03_c01",
+  "WD86056_r03_c02",
+  "WD86056_r03_c03",
+  "WD86056_r03_c04",
+  "WD86056_r03_c05",
+  "WD86056_r04_c01",
+  "WD86056_r04_c02",
+  "WD86056_r04_c03",
+  "WD86056_r04_c04",
+  "WD86056_r04_c05",
+  "WD86056_r05_c01",
+  "WD86056_r05_c02",
+  "WD86056_r05_c03",
+  "WD86056_r05_c04",
+  "WD86056_r05_c05",
+  "WD86056_r06_c01",
+  "WD86056_r06_c02",
+  "WD86056_r06_c04",
+  "WD86056_r06_c05"
+  #"WD86058_r01_c01",
+  #"WD86058_r01_c02",
+  #"WD86058_r01_c03",
+  #"WD86058_r02_c01",
+  #"WD86058_r02_c02",
+  #"WD86058_r02_c03",
+  #"WD86058_r03_c01",
+  #"WD86058_r03_c01",
+  #"WD86058_r04_c02",
+  #"WD86058_r04_c03",
+  #"WD86058_r05_c02",
+  #"WD86058_r05_c03"
   )
 
 # use data setup function to create sr
@@ -119,7 +157,7 @@ sr2 <- downsample_data(
   markers = locationMarkers,
   masks = c("mask"),#,"epiMask","strMask","tumorMask"),
   njobs = 4,
-  overwrite=T
+  overwrite=F
 )
 ```
 
@@ -156,17 +194,17 @@ It then uses that model to assign the labels to all of the pixels and writes the
 
 ```{r kmeansUntransformed, eval=TRUE}
 # image(raster(sr$MUC2[1]))
-kMeansMarkers <- paste(locationMarkers, 'smooth', sep="_")
+kMeansMarkers <- paste(locationMarkers[c(1,2,3,4,5,6,7,8,11,12,13,14)], 'smooth', sep="_")
 
 sr4 <- cluster_data(
   sr3,
-  k=4,
+  k=5,
   subsamp=8,
   transform=function(x) x,
   offset=0,
   markers=kMeansMarkers,
   seed=NA,
-  out.prefix='locationLabelUntransformed'
+  out.prefix='clusterUntransformed_k5_s50'
 )
 ```
 
@@ -174,14 +212,14 @@ This second chunk runs k-means on the untransformed data and then assigns the va
 
 ```{r kmeansLog10, eval=FALSE}
 sr5 <- cluster_data(
-  sr4,
-  k=4,
+  sr3,
+  k=5,
   subsamp=8,
   transform=log10,
   offset=0.5,
   markers=kMeansMarkers,
   seed=NA,
-  out.prefix='locationLabel'
+  out.prefix='clusterLog10_k5_s50'
 )
 ```
 
