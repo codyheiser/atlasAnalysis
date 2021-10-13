@@ -32,22 +32,22 @@ locationMarkers <- c(
   "ACTG1",
   "ACTININ",
   "BCATENIN",
-  #"CGA",
+  "CGA",
   "COLLAGEN",
-  #"COX2",
+  "COX2",
   "DAPI",
   "ERBB2",
   #"GACTIN",
-  #"HLAA",
-  #"LYSOZYME",
+  "HLAA",
+  "LYSOZYME",
   "MUC2",
   "NAKATPASE",
   "OLFM4",
   "PANCK",
   "PCNA",
   #"PDL1",
-  #"PEGFR",
-  #"PSTAT3",
+  "PEGFR",
+  "PSTAT3",
   "SMA",
   #"SNA",
   "SOX9",
@@ -56,15 +56,15 @@ locationMarkers <- c(
 
 # immune markers for downstream tissue infiltration analysis
 immuneMarkers <- c(
-  #"FOXP3",
-  #"CD3D",
-  #"CD4",
-  #"CD8",
-  #"CD11B",
-  #"CD20",
-  #"CD45",
+  "FOXP3",
+  "CD3D",
+  "CD4",
+  "CD8",
+  "CD11B",
+  "CD20",
+  "CD45",
   #"CD45B",
-  #"CD68"
+  "CD68"
   )
 
 # define slide names in directory structure
@@ -80,7 +80,7 @@ slides <- c(
   #"MAP06025_0000_02_01",
   "WD86056_r01_c02",
   "WD86056_r01_c03",
-  #"WD86056_r01_c04",
+  "WD86056_r01_c04",
   "WD86056_r02_c02",
   "WD86056_r02_c03",
   "WD86056_r02_c04",
@@ -103,26 +103,28 @@ slides <- c(
   "WD86056_r06_c01",
   "WD86056_r06_c02",
   "WD86056_r06_c04",
-  "WD86056_r06_c05"
-  #"WD86058_r01_c01",
-  #"WD86058_r01_c02",
-  #"WD86058_r01_c03",
-  #"WD86058_r02_c01",
-  #"WD86058_r02_c02",
-  #"WD86058_r02_c03",
-  #"WD86058_r03_c01",
-  #"WD86058_r03_c01",
-  #"WD86058_r04_c02",
-  #"WD86058_r04_c03",
-  #"WD86058_r05_c02",
-  #"WD86058_r05_c03"
+  "WD86056_r06_c05",
+  "WD86058_r01_c01",
+  "WD86058_r01_c02",
+  "WD86058_r01_c03",
+  "WD86058_r02_c01",
+  "WD86058_r02_c02",
+  "WD86058_r02_c03",
+  "WD86058_r03_c02",
+  "WD86058_r03_c03",
+  "WD86058_r04_c02",
+  "WD86058_r04_c03",
+  "WD86058_r05_c02",
+  "WD86058_r05_c03"
   )
+
+slides <- c("WD86058_r01_c02")
 
 # use data setup function to create sr
 sr <- setup_data(
   wd = wd,
   slides = slides,
-  markers = locationMarkers
+  markers = c(locationMarkers, immuneMarkers)
 )
 
 # # append tumor subtype information (optional)
@@ -154,7 +156,7 @@ The code chunk below also includes initial parameters for the kmeans and smoothi
 sr2 <- downsample_data(
   sr,
   fact = 8,
-  markers = locationMarkers,
+  markers = c(locationMarkers, immuneMarkers),
   masks = c("mask"),#,"epiMask","strMask","tumorMask"),
   njobs = 4,
   overwrite=F
